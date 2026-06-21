@@ -27,15 +27,20 @@ spec:
               name: app-secret
               key: MYSQL_ROOT_PASSWORD
               
-       env:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
               name: app-secret
               key: MYSQL_PASSWORD
-       env:
+       
         - name: MYSQL_USER
           valueFrom:
             secretKeyRef:
               name: app-secret
               key: MYSQL_USER
+
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MYSQL_DATABASE      

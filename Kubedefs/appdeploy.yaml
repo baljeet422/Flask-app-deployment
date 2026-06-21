@@ -23,7 +23,14 @@ spec:
         image: redis:7-alpine ###################### to be changed
         ports:
         - containerPort: 8181
-          targetPort: AppPort
+          name: AppPort
+
+      envFrom:
+      - configMapRef:
+          name: app-config
+
+      - secretRef:
+          name: app-secret    
 
       initContainers:     ###########  it runs before main container,and its task is to check that all the backend services are up ,and as it is completed then container is dead.
       - name: init-flaskdb
