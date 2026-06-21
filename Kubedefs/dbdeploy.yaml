@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: flaskdb
+ labels:
+   app: flaskdb
+spec:
+ replicas: 1
+ selector:
+   matchLabels:
+     app: flaskdb   ################## pods with this label will run
+ template:
+   metadata:
+     labels:
+       app: flaskdb
+   spec:
+     containers:
+     - name: flaskdb
+       image: nginx:1.14.2  ########################### to change
+       ports:
+       - name: flask-port
+       - containerPort: 3306
+       env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: MYSQL_ROOT_PASSWORD
+              
+       env:
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: MYSQL_PASSWORD
+       env:
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: MYSQL_USER

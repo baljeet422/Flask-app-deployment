@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: flask-app
+  labels:
+    app: flask-app
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flask-app
+
+  template:   
+    metadata:
+      labels:
+        app: flask-app  
+
+    spec:
+      containers:
+      - name: flask-app  
+        image: redis:7-alpine ###################### to be changed
+        ports:
+        - containerPort: 8181
+          targetPort: AppPort
+
+      initContainers:     ###########  it runs before main container,and its task is to check that all the backend services are up ,and as it is completed then container is dead.
+      - name: init-flaskdb
+        image: busybox:1.28
+        command: ['sh', '-c', "until nslookup flaskdb.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for myservice; sleep 2; done"]
+      - name: init-flask-redis
+        image: busybox:1.28
+        command: ['sh', '-c', "until nslookup flask-redis.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done"]    

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: flask-redis
+  labels:
+    app: flask-redis
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: flask-redis #### must be same
+
+  template:   ########################  from here pod details starts pods -> containers -> image 
+    metadata:
+      labels:
+        app: flask-redis  #### must be same with matchlabels
+
+    spec:
+      containers:
+      - name: flask-redis  
+
+        image: redis:7-alpine
+
+        ports:
+        - containerPort: 6379
+          targetPort: redisPort
+
+        resources:
+          requests:
+             cpu: "100m"
+             memory: "128Mi"
+
+          limits:
+             cpu: "500m"
+             memory: "512Mi"

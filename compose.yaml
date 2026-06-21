@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+   #1
+  phonebook-mysql:
+    container_name: phonebook-mysql
+    build:
+      context: .
+      dockerfile: Dockerfile-mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD} 
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "3306:3306"  
+    restart: always
+
+   #2
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always 
+
+    #3
+  phonebook-app:
+    container_name: phonebook-app
+    build:
+      context: .
+      dockerfile: Dockerfile-app
+    depends_on: 
+      - phonebook-mysql
+      - redis
+    environment:
+      MYSQL_HOST: phonebook-mysql
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+      REDIS_HOST: redis  
+    ports:
+      - "8181:8181"
+    restart: always
+    
+    #4
+  nginx:
+    container_name: nginx
+    build:
+      context: .
+      dockerfile: Dockerfile-nginx
+
+    depends_on:
+      - phonebook-app
+
+    ports:
+      - "80:80"
+
+    restart: always  
