@@ -6,7 +6,7 @@ services:
     container_name: phonebook-mysql
     build:
       context: .
-      dockerfile: Dockerfile-mysql
+      dockerfile: Dockerfiles/mysql/Dockerfile
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -29,7 +29,7 @@ services:
     container_name: phonebook-app
     build:
       context: .
-      dockerfile: Dockerfile-app
+      dockerfile: Dockerfiles/app/Dockerfile
     depends_on: 
       - phonebook-mysql
       - redis
@@ -49,7 +49,7 @@ services:
     container_name: nginx
     build:
       context: .
-      dockerfile: Dockerfile-nginx
+      dockerfile: Dockerfiles/nginx/Dockerfile
 
     depends_on:
       - phonebook-app
