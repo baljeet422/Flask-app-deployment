@@ -1,0 +1,193 @@
+name: Phonebook CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+env:
+  PYTHON_VERSION: "3.12"
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  HELM_REPO_NAME: ${{ vars.HELM_REPO_NAME }} 
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}     
+
+jobs:
+
+  pr-validation:
+    if: github.event_name == 'pull_request'
+
+    name: PR Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint
+          pip install -r source_code/requirements.txt
+
+      - name: Run Pylint
+        run: |
+          pylint source_code --fail-under=8
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+  #########################################################
+
+  build-scan-push:
+  if: github.event_name == 'push'
+
+  runs-on: ubuntu-latest
+
+  outputs:
+  ecr_registry: ${{ steps.set-outputs.outputs.ecr_registry }}
+  ecr_image: ${{ steps.set-outputs.outputs.ecr_image }}
+  image_tag: ${{ steps.set-outputs.outputs.image_tag }}
+
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build Docker Image
+      id: set-outputs
+      run: |
+       ECR_REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com
+       IMAGE_TAG=${GITHUB_SHA::7}
+       ECR_IMAGE=${ECR_REGISTRY}/${ECR_REPOSITORY}
+       docker build -f Dockerfiles/app/Dockerfile -t ${ECR_IMAGE}:${IMAGE_TAG} .
+       docker tag ${ECR_IMAGE}:${IMAGE_TAG} ${ECR_IMAGE}:latest
+       echo "ecr_registry=${ECR_REGISTRY}" >> $GITHUB_OUTPUT
+       echo "ecr_image=${ECR_IMAGE}" >> $GITHUB_OUTPUT
+       echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+    - name: Trivy Filesystem Scan
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        severity: HIGH,CRITICAL
+        exit-code: '1'
+
+    - name: Trivy Image Scan
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ steps.set-outputs.outputs.ecr_image }}:${{ steps.set-outputs.outputs.image_tag }}
+        severity: HIGH,CRITICAL
+        exit-code: '1'
+
+    - name: Push images
+      run: |
+        docker push ${{ steps.set-outputs.outputs.ecr_image }}:${{ steps.set-outputs.outputs.image_tag }}
+        docker push ${{ steps.set-outputs.outputs.ecr_image }}:latest
+  #########################################################
+
+  update-gitops:
+    if: github.event_name == 'push'
+
+    name: Update Helm Values
+    needs: build-scan-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+          https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Clone GitOps Repo
+        run: |
+          git clone \
+          https://${{ secrets.HELM_REPO_USER }}:${{ secrets.GITOPS_PAT }}@github.com/${{ github.repository_owner }}/${{ env.HELM_REPO_NAME }}.git flask-helm-ArgoCD
+
+      - name: Update values.yaml
+        run: |
+          cd flask-helm-ArgoCD
+
+          yq eval '.image.repository = env(ECR_IMAGE) |.image.tag = env(IMAGE_TAG)' -i helm/phonebook/values.yaml
+        env:
+          ECR_IMAGE: ${{ needs.build-scan-push.outputs.ecr_image }}
+          IMAGE_TAG: ${{ needs.build-scan-push.outputs.image_tag }}
+
+      - name: Commit Changes
+        env:
+          IMAGE_TAG: ${{ needs.build-scan-push.outputs.image_tag }}
+          GIT_AUTHOR_NAME: github-actions
+          GIT_AUTHOR_EMAIL: actions@github.com
+        run: |
+          cd flask-helm-ArgoCD
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          if ! git diff --cached --quiet; then
+            git add helm/phonebook/values.yaml
+            git commit -m "Update image tag to ${IMAGE_TAG}"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit"
+          fi
+  #########################################################
+
+  slack-success:
+    if: success() && github.event_name == 'push'
+
+    needs:
+      - update-gitops
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Slack
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{\"text\":\"✅ Phonebook deployment successful. Image Tag: ${GITHUB_SHA}\"}" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+  #########################################################
+
+  slack-failure:
+    if: always() && failure() && github.event_name == 'push'
+
+    needs:
+      - build-scan-push
+      - update-gitops
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Slack
+        run: |
+          curl -X POST \
+          -H "Content-Type: application/json" \
+          -d "{\"text\":\"❌ Phonebook pipeline failed. Repository: ${{ github.repository }}\"}" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
