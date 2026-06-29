@@ -3,6 +3,7 @@ version: '3.8'
 services:
    #1
   phonebook-mysql:
+    image: baljeetkaur12/flask-mysql-img
     container_name: phonebook-mysql
     build:
       context: .
@@ -26,6 +27,7 @@ services:
 
     #3
   phonebook-app:
+    image: baljeetkaur12/flask-app-img
     container_name: phonebook-app
     build:
       context: .
@@ -46,6 +48,7 @@ services:
     
     #4
   nginx:
+    image: baljeetkaur12/flask-nginx-img
     container_name: nginx
     build:
       context: .
