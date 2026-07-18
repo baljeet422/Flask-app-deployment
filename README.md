@@ -106,11 +106,6 @@ Before running the project, ensure you have:
 - Git
 - A terminal with access to the Docker daemon
 
-Optional for Kubernetes/Helm deployments:
-
-- kubectl
-- Helm v3
-- Access to a Kubernetes cluster
 
 ## Local Development
 
@@ -179,52 +174,6 @@ docker compose ps
 docker compose logs -f
 docker compose down -v
 ```
-
-## Kubernetes Deployment
-
-A Kubernetes deployment can be created by packaging the application into Deployments, Services, ConfigMaps, and Secrets.
-
-Suggested resources:
-
-- Deployment for the Flask app
-- Service exposing the Flask app internally
-- Deployment for MySQL and Redis
-- ConfigMap for non-sensitive configuration
-- Secret for database credentials and application secrets
-
-Example deployment workflow:
-
-```bash
-kubectl create namespace phonebook
-kubectl apply -f k8s/
-```
-
-A production deployment should also include:
-
-- PersistentVolumeClaims for MySQL data
-- Resource requests and limits
-- Readiness and liveness probes
-- Ingress for external access
-
-## Helm Deployment
-
-Helm can be used to package the Kubernetes manifests for easier release management.
-
-Example workflow:
-
-```bash
-helm create phonebook-chart
-helm install phonebook ./phonebook-chart
-```
-
-Recommended Helm values:
-
-- image.repository
-- image.tag
-- service.type
-- mysql.persistence.enabled
-- redis.enabled
-- ingress.enabled
 
 ## CI/CD Pipeline
 
