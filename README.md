@@ -49,21 +49,18 @@ flowchart TD
 
 ## Tech Stack
 
-- Python
-- Flask
-- PyMySQL
-- MySQL
-- Redis
-- Nginx
-- Docker
-- Compose
-- Kubernetes
-- Helm
-- GitHub Actions
-- Trivy
-- SonarQube
-- Snyk
-- Dependabot
+| Layer                     | Technology                                    |
+| ------------------------- | --------------------------------------------- |
+| Application               | Python, Flask, Jinja2 (server-side templates) |
+| Database                  | MySQL (flaskmysql.sql), PyMySQL connector     |
+| Cache                     | Redis                                         |
+| Reverse Proxy             | Nginx                                         |
+| Containers                | Docker, Docker Compose                        |
+| Local Dev Tools           | Docker Desktop, Git                           |
+| CI/CD                     | GitHub Actions                                |
+| Security / Scanning       | Trivy, SonarQube, Snyk, Dependabot            |
+| Monitoring                | Prometheus + Grafana                          |
+| Log Forwarding            | AWS Fluent Bit → CloudWatch                   |
 
 ## Repository Structure
 
@@ -105,7 +102,6 @@ Before running the project, ensure you have:
 - Docker Compose v2
 - Git
 - A terminal with access to the Docker daemon
-
 
 ## Local Development
 
